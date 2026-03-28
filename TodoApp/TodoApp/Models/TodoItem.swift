@@ -14,4 +14,5 @@ struct TodoItem : Identifiable, Codable{
     var createdAt :Date = Date()
     var category: Category = .personal
     var priority: Priority = .medium
+    var reminderDate: Date? = nil
 }
