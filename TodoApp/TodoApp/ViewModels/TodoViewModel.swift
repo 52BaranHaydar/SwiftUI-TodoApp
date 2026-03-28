@@ -18,9 +18,9 @@ class TodoViewModel: ObservableObject{
         load()
     }
     
-    func add(title: String){
+    func add(title: String, category: Category = .personal, priority : Priority = .medium){
         guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return }
-        todos.append(TodoItem(title: title))
+        todos.append(TodoItem(title: title, category: category, priority: priority))
         save()
     }
     
@@ -36,6 +36,12 @@ class TodoViewModel: ObservableObject{
         todos.remove(atOffsets: offsets)
         save()
     }
+    
+    func sortByPriority(){
+        todos.sort{ $0.priority > $1.priority}
+        save()
+    }
+    
     
     private func save(){
         if let encoded = try? JSONEncoder().encode(todos){
