@@ -12,6 +12,9 @@ struct ContentView: View {
     @State private var selectedCategory: Category = .personal
     @State private var selectedPriority: Priority = .medium
     @State private var filterCategory: Category? = nil
+    @State private var reminderItem: TodoItem? = nil
+    @State private var reminderDate = Date()
+    @State private var showReminderSheet = false
     
     var filteredTodos: [TodoItem] {
         let list = filterCategory == nil ? vm.todos : vm.todos.filter { $0.category == filterCategory }
@@ -70,7 +73,6 @@ struct ContentView: View {
                     TextField("Yeni görev...", text: $newTitle)
                         .textFieldStyle(.roundedBorder)
                     
-                    // Öncelik seçici
                     Menu {
                         ForEach(Priority.allCases, id: \.self) { priority in
                             Button {
@@ -85,7 +87,6 @@ struct ContentView: View {
                             .foregroundColor(priorityColor)
                     }
                     
-                    // Kategori seçici
                     Menu {
                         ForEach(Category.allCases, id: \.self) { category in
                             Button {
@@ -129,20 +130,38 @@ struct ContentView: View {
                                     .foregroundColor(item.isCompleted ? .gray : .primary)
                                 
                                 HStack(spacing: 8) {
-                                    // Kategori
                                     HStack(spacing: 4) {
                                         Image(systemName: item.category.icon)
                                         Text(item.category.rawValue)
                                     }
                                     
-                                    // Öncelik
                                     HStack(spacing: 4) {
                                         Image(systemName: item.priority.icon)
                                         Text(item.priority.title)
                                     }
+                                    
+                                    if let date = item.reminderDate {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "bell.fill")
+                                            Text(date.formatted(date: .omitted, time: .shortened))
+                                        }
+                                        .foregroundColor(.blue)
+                                    }
                                 }
                                 .font(.caption)
                                 .foregroundColor(.gray)
+                            }
+                            
+                            Spacer()
+                            
+                            // Hatırlatıcı butonu
+                            Button {
+                                reminderItem = item
+                                reminderDate = Date()
+                                showReminderSheet = true
+                            } label: {
+                                Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
+                                    .foregroundColor(item.reminderDate != nil ? .blue : .gray)
                             }
                         }
                     }
@@ -152,6 +171,37 @@ struct ContentView: View {
             .navigationTitle("Görevlerim")
             .toolbar {
                 EditButton()
+            }
+            .sheet(isPresented: $showReminderSheet) {
+                NavigationStack {
+                    VStack(spacing: 24) {
+                        if let item = reminderItem {
+                            Text(item.title)
+                                .font(.headline)
+                        }
+                        
+                        DatePicker("Hatırlatma Zamanı", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
+                            .datePickerStyle(.graphical)
+                            .padding()
+                    }
+                    .navigationTitle("Hatırlatıcı Ekle")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("İptal") {
+                                showReminderSheet = false
+                            }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Kaydet") {
+                                if let item = reminderItem {
+                                    vm.setReminder(for: item, at: reminderDate)
+                                }
+                                showReminderSheet = false
+                            }
+                        }
+                    }
+                }
             }
         }
     }
