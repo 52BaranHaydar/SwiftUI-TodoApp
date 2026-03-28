@@ -4,10 +4,12 @@
 //
 //  Created by Baran on 28.03.2026.
 //
+
 import SwiftUI
 
 struct ContentView: View {
     @StateObject private var vm = TodoViewModel()
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var newTitle = ""
     @State private var selectedCategory: Category = .personal
     @State private var selectedPriority: Priority = .medium
@@ -15,7 +17,6 @@ struct ContentView: View {
     @State private var reminderItem: TodoItem? = nil
     @State private var reminderDate = Date()
     @State private var showReminderSheet = false
-    @EnvironmentObject var themeManager: ThemeManager
     
     var filteredTodos: [TodoItem] {
         let list = filterCategory == nil ? vm.todos : vm.todos.filter { $0.category == filterCategory }
@@ -155,7 +156,6 @@ struct ContentView: View {
                             
                             Spacer()
                             
-                            // Hatırlatıcı butonu
                             Button {
                                 reminderItem = item
                                 reminderDate = Date()
@@ -171,7 +171,17 @@ struct ContentView: View {
             }
             .navigationTitle("Görevlerim")
             .toolbar {
-                EditButton()
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        themeManager.isDarkMode.toggle()
+                    } label: {
+                        Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
+                            .foregroundColor(themeManager.isDarkMode ? .yellow : .orange)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    EditButton()
+                }
             }
             .sheet(isPresented: $showReminderSheet) {
                 NavigationStack {
@@ -188,16 +198,18 @@ struct ContentView: View {
                     .navigationTitle("Hatırlatıcı Ekle")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button {
-                                themeManager.isDarkMode.toggle()
-                            } label: {
-                                Image(systemName: themeManager.isDarkMode ? "sun.max.fill" : "moon.fill")
-                                    .foregroundColor(themeManager.isDarkMode ? .yellow : .blue)
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("İptal") {
+                                showReminderSheet = false
                             }
                         }
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            EditButton()
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Kaydet") {
+                                if let item = reminderItem {
+                                    vm.setReminder(for: item, at: reminderDate)
+                                }
+                                showReminderSheet = false
+                            }
                         }
                     }
                 }
@@ -208,4 +220,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
+        .environmentObject(ThemeManager())
 }
