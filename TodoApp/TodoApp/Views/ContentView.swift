@@ -21,6 +21,9 @@ struct ContentView: View {
     @State private var showPaywall = false
     @State private var showLimitAlert = false
     @State private var searchText = ""
+    @State private var editingTodo: TodoItem? = nil
+    @State private var showCalendar = false
+    @State private var selectedTab = 0
     
     let freeLimit = 5
     let freeCategories: [Category] = [.personal, .work]
@@ -29,6 +32,9 @@ struct ContentView: View {
         var list = filterCategory == nil ? vm.todos : vm.todos.filter { $0.category == filterCategory }
         if !searchText.isEmpty {
             list = list.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+        }
+        if searchText.isEmpty && filterCategory == nil {
+            return list
         }
         return list.sorted { $0.priority > $1.priority }
     }
@@ -46,6 +52,72 @@ struct ContentView: View {
     }
     
     var body: some View {
+        TabView(selection: $selectedTab) {
+            
+            // Ana Sayfa
+            mainView
+                .tabItem {
+                    Label("Görevler", systemImage: "checklist")
+                }
+                .tag(0)
+            
+            // Takvim (Pro)
+            Group {
+                if premiumManager.isPremium {
+                    CalendarView(todos: vm.todos)
+                        .environmentObject(languageManager)
+                } else {
+                    proRequiredView(icon: "calendar", title: "Takvim")
+                }
+            }
+            .tabItem {
+                Label("Takvim", systemImage: "calendar")
+            }
+            .tag(1)
+        }
+        .sheet(isPresented: $showPaywall) { PaywallView() }
+        .sheet(item: $editingTodo) { todo in
+            EditTodoView(todo: todo) { updated in
+                vm.update(updated)
+            }
+            .environmentObject(languageManager)
+        }
+        .sheet(isPresented: $showReminderSheet) {
+            NavigationStack {
+                VStack(spacing: 24) {
+                    if let item = reminderItem {
+                        Text(item.title).font(.headline)
+                    }
+                    DatePicker(
+                        "reminder_time".localized(using: languageManager),
+                        selection: $reminderDate,
+                        in: Date()...,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    .datePickerStyle(.graphical)
+                    .padding()
+                }
+                .navigationTitle("add_reminder".localized(using: languageManager))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("cancel".localized(using: languageManager)) { showReminderSheet = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("save".localized(using: languageManager)) {
+                            if let item = reminderItem {
+                                vm.setReminder(for: item, at: reminderDate)
+                            }
+                            showReminderSheet = false
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Ana Görünüm
+    var mainView: some View {
         NavigationStack {
             ZStack {
                 LinearGradient(
@@ -81,8 +153,11 @@ struct ContentView: View {
                             .padding(.horizontal)
                             .padding(.vertical, 10)
                             .background(
-                                LinearGradient(colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
-                                               startPoint: .leading, endPoint: .trailing)
+                                LinearGradient(
+                                    colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
                             .foregroundColor(.blue)
                         }
@@ -139,6 +214,7 @@ struct ContentView: View {
                             Image(systemName: "magnifyingglass")
                                 .foregroundColor(.gray)
                             TextField("search_task".localized(using: languageManager), text: $searchText)
+                                .autocorrectionDisabled()
                         }
                         .padding(10)
                         .background(Color.gray.opacity(0.1))
@@ -153,12 +229,13 @@ struct ContentView: View {
                             .padding(10)
                             .background(Color.gray.opacity(0.1))
                             .cornerRadius(12)
+                            .autocorrectionDisabled()
                         
                         if premiumManager.isPremium {
                             Menu {
                                 ForEach(Priority.allCases, id: \.self) { priority in
                                     Button {
-                                        selectedPriority = priority
+                                        withAnimation { selectedPriority = priority }
                                     } label: {
                                         Label(priority.title(using: languageManager), systemImage: priority.icon)
                                     }
@@ -176,7 +253,7 @@ struct ContentView: View {
                         Menu {
                             ForEach(availableCategories, id: \.self) { category in
                                 Button {
-                                    selectedCategory = category
+                                    withAnimation { selectedCategory = category }
                                 } label: {
                                     Label(category.title(using: languageManager), systemImage: category.icon)
                                 }
@@ -194,7 +271,7 @@ struct ContentView: View {
                             if !premiumManager.isPremium && vm.todos.count >= freeLimit {
                                 showLimitAlert = true
                             } else {
-                                withAnimation(.spring()) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                     vm.add(title: newTitle, category: selectedCategory, priority: selectedPriority)
                                     newTitle = ""
                                 }
@@ -207,25 +284,28 @@ struct ContentView: View {
                                 .frame(width: 36, height: 36)
                                 .background(newTitle.isEmpty ? Color.gray : Color.blue)
                                 .clipShape(Circle())
-                                .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
+                                .shadow(color: newTitle.isEmpty ? .clear : .blue.opacity(0.4), radius: 6, x: 0, y: 3)
+                                .animation(.spring(), value: newTitle.isEmpty)
                         }
                         .disabled(newTitle.isEmpty)
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 8)
                     
-                    // Görev sayısı (ücretsiz)
+                    // Görev sayısı progress (ücretsiz)
                     if !premiumManager.isPremium {
-                        HStack {
-                            ProgressView(value: Double(vm.todos.count), total: Double(freeLimit))
+                        HStack(spacing: 8) {
+                            ProgressView(value: Double(min(vm.todos.count, freeLimit)), total: Double(freeLimit))
                                 .tint(vm.todos.count >= freeLimit ? .red : .blue)
+                                .animation(.easeInOut, value: vm.todos.count)
                             Text("\(vm.todos.count)/\(freeLimit)")
                                 .font(.caption)
+                                .fontWeight(.medium)
                                 .foregroundColor(vm.todos.count >= freeLimit ? .red : .gray)
                                 .frame(width: 35)
                         }
                         .padding(.horizontal)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 6)
                     }
                     
                     // Görev listesi
@@ -235,11 +315,16 @@ struct ContentView: View {
                                 item: item,
                                 languageManager: languageManager,
                                 isPremium: premiumManager.isPremium,
-                                onToggle: { vm.toggle(item) },
+                                onToggle: {
+                                    withAnimation(.spring()) { vm.toggle(item) }
+                                },
                                 onReminder: {
                                     reminderItem = item
-                                    reminderDate = Date()
+                                    reminderDate = item.reminderDate ?? Date()
                                     showReminderSheet = true
+                                },
+                                onEdit: {
+                                    editingTodo = item
                                 }
                             )
                             .listRowBackground(Color.clear)
@@ -247,28 +332,33 @@ struct ContentView: View {
                             .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
                         .onDelete(perform: vm.delete)
+                        .onMove(perform: vm.move)
                     }
                     .listStyle(.plain)
                     .scrollContentBackground(.hidden)
+                    .animation(.spring(), value: vm.todos.count)
                 }
             }
             .navigationTitle("app_title".localized(using: languageManager))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
-                        themeManager.isDarkMode.toggle()
+                        withAnimation { themeManager.isDarkMode.toggle() }
                     } label: {
                         Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
                             .foregroundColor(themeManager.isDarkMode ? .yellow : .orange)
                             .frame(width: 32, height: 32)
                             .background(Color.gray.opacity(0.15))
                             .clipShape(Circle())
+                            .animation(.spring(), value: themeManager.isDarkMode)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 8) {
                         Button {
-                            languageManager.language = languageManager.language == "tr" ? "en" : "tr"
+                            withAnimation {
+                                languageManager.language = languageManager.language == "tr" ? "en" : "tr"
+                            }
                         } label: {
                             Text(languageManager.language == "tr" ? "🇹🇷" : "🇬🇧")
                                 .font(.title3)
@@ -293,40 +383,43 @@ struct ContentView: View {
             } message: {
                 Text("limit_message".localized(using: languageManager))
             }
-            .sheet(isPresented: $showPaywall) { PaywallView() }
-            .sheet(isPresented: $showReminderSheet) {
-                NavigationStack {
-                    VStack(spacing: 24) {
-                        if let item = reminderItem {
-                            Text(item.title).font(.headline)
-                        }
-                        DatePicker(
-                            "reminder_time".localized(using: languageManager),
-                            selection: $reminderDate,
-                            in: Date()...,
-                            displayedComponents: [.date, .hourAndMinute]
-                        )
-                        .datePickerStyle(.graphical)
-                        .padding()
-                    }
-                    .navigationTitle("add_reminder".localized(using: languageManager))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("cancel".localized(using: languageManager)) { showReminderSheet = false }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("save".localized(using: languageManager)) {
-                                if let item = reminderItem {
-                                    vm.setReminder(for: item, at: reminderDate)
-                                }
-                                showReminderSheet = false
-                            }
-                        }
-                    }
+        }
+    }
+    
+    // MARK: - Pro Gerekli Görünüm
+    func proRequiredView(icon: String, title: String) -> some View {
+        VStack(spacing: 20) {
+            Image(systemName: icon)
+                .font(.system(size: 60))
+                .foregroundColor(.gray.opacity(0.4))
+            
+            Text(title)
+                .font(.title2)
+                .fontWeight(.bold)
+            
+            Text("Bu özellik Pro sürümde mevcut")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+                .multilineTextAlignment(.center)
+            
+            Button {
+                showPaywall = true
+            } label: {
+                HStack {
+                    Image(systemName: "star.fill")
+                        .foregroundColor(.yellow)
+                    Text("Pro'ya Geç — $0.99")
+                        .fontWeight(.bold)
                 }
+                .padding()
+                .frame(maxWidth: .infinity)
+                .background(Color.blue)
+                .foregroundColor(.white)
+                .cornerRadius(16)
+                .padding(.horizontal, 40)
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -364,6 +457,7 @@ struct TodoRowView: View {
     let isPremium: Bool
     let onToggle: () -> Void
     let onReminder: () -> Void
+    let onEdit: () -> Void
     
     var body: some View {
         HStack(spacing: 12) {
@@ -371,6 +465,7 @@ struct TodoRowView: View {
                 Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
                     .foregroundColor(item.isCompleted ? .green : .gray)
                     .font(.title2)
+                    .animation(.spring(), value: item.isCompleted)
             }
             .buttonStyle(.plain)
             
@@ -379,6 +474,7 @@ struct TodoRowView: View {
                     .strikethrough(item.isCompleted)
                     .foregroundColor(item.isCompleted ? .gray : .primary)
                     .fontWeight(.medium)
+                    .animation(.easeInOut, value: item.isCompleted)
                 
                 HStack(spacing: 6) {
                     Label(item.category.title(using: languageManager), systemImage: item.category.icon)
@@ -386,7 +482,7 @@ struct TodoRowView: View {
                         .foregroundColor(item.category.color)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(item.category.color.opacity(0.1))
+                        .background(item.category.color.opacity(0.15))
                         .cornerRadius(6)
                     
                     Label(item.priority.title(using: languageManager), systemImage: item.priority.icon)
@@ -394,7 +490,7 @@ struct TodoRowView: View {
                         .foregroundColor(item.priority.color)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(item.priority.color.opacity(0.1))
+                        .background(item.priority.color.opacity(0.15))
                         .cornerRadius(6)
                     
                     if let date = item.reminderDate {
@@ -403,7 +499,7 @@ struct TodoRowView: View {
                             .foregroundColor(.blue)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.1))
+                            .background(Color.blue.opacity(0.15))
                             .cornerRadius(6)
                     }
                 }
@@ -411,18 +507,30 @@ struct TodoRowView: View {
             
             Spacer()
             
-            if isPremium {
-                Button(action: onReminder) {
-                    Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
-                        .foregroundColor(item.reminderDate != nil ? .blue : .gray)
+            HStack(spacing: 8) {
+                // Düzenle butonu
+                Button(action: onEdit) {
+                    Image(systemName: "pencil.circle.fill")
+                        .foregroundColor(.blue.opacity(0.7))
                         .font(.title3)
                 }
                 .buttonStyle(.plain)
+                
+                // Hatırlatıcı butonu (Pro)
+                if isPremium {
+                    Button(action: onReminder) {
+                        Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
+                            .foregroundColor(item.reminderDate != nil ? .blue : .gray)
+                            .font(.title3)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
         .padding(12)
         .background(Color.gray.opacity(0.08))
         .cornerRadius(16)
+        .contentShape(Rectangle())
     }
 }
 
@@ -443,7 +551,7 @@ extension Color {
         default:
             (a, r, g, b) = (1, 1, 1, 0)
         }
-        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue:  Double(b) / 255, opacity: Double(a) / 255)
     }
 }
 
