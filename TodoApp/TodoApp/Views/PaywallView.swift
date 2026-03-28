@@ -113,6 +113,12 @@ struct PaywallView: View {
                                 .font(.caption)
                                 .foregroundColor(.gray)
                         }
+                        Button("🧪 Test: Pro'yu Aktif Et") {
+                            premiumManager.simulatePurchase()
+                            dismiss()
+                        }
+                        .font(.caption)
+                        .foregroundColor(.green)
                     }
                     .padding(.bottom, 32)
                 }

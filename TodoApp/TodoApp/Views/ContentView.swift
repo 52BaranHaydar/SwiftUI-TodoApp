@@ -9,6 +9,7 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var vm = TodoViewModel()
     @EnvironmentObject var themeManager: ThemeManager
+    @EnvironmentObject var languageManager: LanguageManager
     @ObservedObject var premiumManager = PremiumManager.shared
     @State private var newTitle = ""
     @State private var selectedCategory: Category = .personal
@@ -46,224 +47,212 @@ struct ContentView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
+            ZStack {
+                LinearGradient(
+                    colors: themeManager.isDarkMode
+                        ? [Color.black, Color(hex: "1a1a2e")]
+                        : [Color(hex: "f0f4ff"), Color.white],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
                 
-                // Pro Banner (ücretsiz kullanıcılar için)
-                if !premiumManager.isPremium {
-                    Button {
-                        showPaywall = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.yellow)
-                            Text("Pro'ya geç — Sınırsız görev & daha fazlası")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                            Spacer()
-                            Text("$0.99")
-                                .font(.caption)
-                                .fontWeight(.bold)
+                VStack(spacing: 0) {
+                    
+                    // Pro Banner
+                    if !premiumManager.isPremium {
+                        Button { showPaywall = true } label: {
+                            HStack {
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.yellow)
+                                Text("pro_banner".localized(using: languageManager))
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                                Spacer()
+                                Text("$0.99")
+                                    .font(.caption)
+                                    .fontWeight(.bold)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(8)
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 10)
+                            .background(
+                                LinearGradient(colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.1)],
+                                               startPoint: .leading, endPoint: .trailing)
+                            )
+                            .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    // İstatistikler (Pro)
+                    if premiumManager.isPremium {
+                        StatsView(todos: vm.todos)
+                            .padding(.top, 8)
+                    }
+                    
+                    // Kategori Filtresi
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            CategoryChip(
+                                title: "all".localized(using: languageManager),
+                                icon: "square.grid.2x2.fill",
+                                color: .blue,
+                                isSelected: filterCategory == nil
+                            ) { filterCategory = nil }
+                            
+                            ForEach(availableCategories, id: \.self) { category in
+                                CategoryChip(
+                                    title: category.title(using: languageManager),
+                                    icon: category.icon,
+                                    color: category.color,
+                                    isSelected: filterCategory == category
+                                ) { filterCategory = category }
+                            }
+                            
+                            if !premiumManager.isPremium {
+                                Button { showPaywall = true } label: {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "lock.fill")
+                                        Text("Pro")
+                                    }
+                                    .font(.subheadline)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .background(Color.yellow.opacity(0.2))
+                                    .foregroundColor(.orange)
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.orange.opacity(0.4), lineWidth: 1))
+                                }
+                            }
                         }
                         .padding(.horizontal)
-                        .padding(.vertical, 10)
-                        .background(Color.blue.opacity(0.1))
-                        .foregroundColor(.blue)
+                        .padding(.vertical, 8)
                     }
-                }
-                
-                // İstatistikler (Pro)
-                if premiumManager.isPremium {
-                    StatsView(todos: vm.todos)
-                        .padding(.top, 8)
-                }
-                
-                // Kategori Filtresi
-                ScrollView(.horizontal, showsIndicators: false) {
+                    
+                    // Arama (Pro)
+                    if premiumManager.isPremium {
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.gray)
+                            TextField("search_task".localized(using: languageManager), text: $searchText)
+                        }
+                        .padding(10)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(12)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                    }
+                    
+                    // Görev ekleme
                     HStack(spacing: 8) {
-                        Button {
-                            filterCategory = nil
+                        TextField("new_task".localized(using: languageManager), text: $newTitle)
+                            .padding(10)
+                            .background(Color.gray.opacity(0.1))
+                            .cornerRadius(12)
+                        
+                        if premiumManager.isPremium {
+                            Menu {
+                                ForEach(Priority.allCases, id: \.self) { priority in
+                                    Button {
+                                        selectedPriority = priority
+                                    } label: {
+                                        Label(priority.title(using: languageManager), systemImage: priority.icon)
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: selectedPriority.icon)
+                                    .font(.title2)
+                                    .foregroundColor(priorityColor)
+                                    .frame(width: 36, height: 36)
+                                    .background(priorityColor.opacity(0.15))
+                                    .clipShape(Circle())
+                            }
+                        }
+                        
+                        Menu {
+                            ForEach(availableCategories, id: \.self) { category in
+                                Button {
+                                    selectedCategory = category
+                                } label: {
+                                    Label(category.title(using: languageManager), systemImage: category.icon)
+                                }
+                            }
                         } label: {
-                            Text("Tümü")
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(filterCategory == nil ? Color.blue : Color.gray.opacity(0.2))
-                                .foregroundColor(filterCategory == nil ? .white : .primary)
-                                .clipShape(Capsule())
+                            Image(systemName: selectedCategory.icon)
+                                .font(.title2)
+                                .foregroundColor(selectedCategory.color)
+                                .frame(width: 36, height: 36)
+                                .background(selectedCategory.color.opacity(0.15))
+                                .clipShape(Circle())
                         }
                         
-                        ForEach(availableCategories, id: \.self) { category in
-                            Button {
-                                filterCategory = category
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: category.icon)
-                                    Text(category.rawValue)
+                        Button {
+                            if !premiumManager.isPremium && vm.todos.count >= freeLimit {
+                                showLimitAlert = true
+                            } else {
+                                withAnimation(.spring()) {
+                                    vm.add(title: newTitle, category: selectedCategory, priority: selectedPriority)
+                                    newTitle = ""
                                 }
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(filterCategory == category ? Color.blue : Color.gray.opacity(0.2))
-                                .foregroundColor(filterCategory == category ? .white : .primary)
-                                .clipShape(Capsule())
                             }
+                        } label: {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.white)
+                                .frame(width: 36, height: 36)
+                                .background(newTitle.isEmpty ? Color.gray : Color.blue)
+                                .clipShape(Circle())
+                                .shadow(color: .blue.opacity(0.3), radius: 4, x: 0, y: 2)
                         }
-                        
-                        // Pro kategoriler kilidi
-                        if !premiumManager.isPremium {
-                            Button {
-                                showPaywall = true
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "lock.fill")
-                                    Text("Pro")
-                                }
-                                .font(.subheadline)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.yellow.opacity(0.2))
-                                .foregroundColor(.orange)
-                                .clipShape(Capsule())
-                            }
-                        }
+                        .disabled(newTitle.isEmpty)
                     }
-                    .padding()
-                }
-                
-                // Arama (Pro)
-                if premiumManager.isPremium {
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.gray)
-                        TextField("Görev ara...", text: $searchText)
-                    }
-                    .padding(10)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(10)
                     .padding(.horizontal)
                     .padding(.bottom, 8)
-                }
-                
-                // Görev ekleme alanı
-                HStack {
-                    TextField("Yeni görev...", text: $newTitle)
-                        .textFieldStyle(.roundedBorder)
                     
-                    if premiumManager.isPremium {
-                        Menu {
-                            ForEach(Priority.allCases, id: \.self) { priority in
-                                Button {
-                                    selectedPriority = priority
-                                } label: {
-                                    Label(priority.title, systemImage: priority.icon)
-                                }
-                            }
-                        } label: {
-                            Image(systemName: selectedPriority.icon)
-                                .font(.title2)
-                                .foregroundColor(priorityColor)
-                        }
-                    }
-                    
-                    Menu {
-                        ForEach(availableCategories, id: \.self) { category in
-                            Button {
-                                selectedCategory = category
-                            } label: {
-                                Label(category.rawValue, systemImage: category.icon)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: selectedCategory.icon)
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                    }
-                    
-                    Button {
-                        if !premiumManager.isPremium && vm.todos.count >= freeLimit {
-                            showLimitAlert = true
-                        } else {
-                            vm.add(title: newTitle, category: selectedCategory, priority: selectedPriority)
-                            newTitle = ""
-                        }
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.blue)
-                    }
-                }
-                .padding(.horizontal)
-                .padding(.bottom, 8)
-                
-                // Görev sayısı (ücretsiz)
-                if !premiumManager.isPremium {
-                    HStack {
-                        Text("\(vm.todos.count)/\(freeLimit) görev kullanılıyor")
-                            .font(.caption)
-                            .foregroundColor(vm.todos.count >= freeLimit ? .red : .gray)
-                        Spacer()
-                    }
-                    .padding(.horizontal)
-                    .padding(.bottom, 4)
-                }
-                
-                // Görev listesi
-                List {
-                    ForEach(filteredTodos) { item in
+                    // Görev sayısı (ücretsiz)
+                    if !premiumManager.isPremium {
                         HStack {
-                            Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
-                                .foregroundColor(item.isCompleted ? .green : .gray)
-                                .font(.title3)
-                                .onTapGesture {
-                                    vm.toggle(item)
-                                }
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.title)
-                                    .strikethrough(item.isCompleted)
-                                    .foregroundColor(item.isCompleted ? .gray : .primary)
-                                
-                                HStack(spacing: 8) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: item.category.icon)
-                                        Text(item.category.rawValue)
-                                    }
-                                    
-                                    HStack(spacing: 4) {
-                                        Image(systemName: item.priority.icon)
-                                        Text(item.priority.title)
-                                    }
-                                    
-                                    if let date = item.reminderDate {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "bell.fill")
-                                            Text(date.formatted(date: .omitted, time: .shortened))
-                                        }
-                                        .foregroundColor(.blue)
-                                    }
-                                }
+                            ProgressView(value: Double(vm.todos.count), total: Double(freeLimit))
+                                .tint(vm.todos.count >= freeLimit ? .red : .blue)
+                            Text("\(vm.todos.count)/\(freeLimit)")
                                 .font(.caption)
-                                .foregroundColor(.gray)
-                            }
-                            
-                            Spacer()
-                            
-                            if premiumManager.isPremium {
-                                Button {
+                                .foregroundColor(vm.todos.count >= freeLimit ? .red : .gray)
+                                .frame(width: 35)
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 4)
+                    }
+                    
+                    // Görev listesi
+                    List {
+                        ForEach(filteredTodos) { item in
+                            TodoRowView(
+                                item: item,
+                                languageManager: languageManager,
+                                isPremium: premiumManager.isPremium,
+                                onToggle: { vm.toggle(item) },
+                                onReminder: {
                                     reminderItem = item
                                     reminderDate = Date()
                                     showReminderSheet = true
-                                } label: {
-                                    Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
-                                        .foregroundColor(item.reminderDate != nil ? .blue : .gray)
                                 }
-                            }
+                            )
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
+                        .onDelete(perform: vm.delete)
                     }
-                    .onDelete(perform: vm.delete)
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
-            .navigationTitle("Görevlerim")
+            .navigationTitle("app_title".localized(using: languageManager))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button {
@@ -271,14 +260,25 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: themeManager.isDarkMode ? "moon.fill" : "sun.max.fill")
                             .foregroundColor(themeManager.isDarkMode ? .yellow : .orange)
+                            .frame(width: 32, height: 32)
+                            .background(Color.gray.opacity(0.15))
+                            .clipShape(Circle())
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack {
+                    HStack(spacing: 8) {
+                        Button {
+                            languageManager.language = languageManager.language == "tr" ? "en" : "tr"
+                        } label: {
+                            Text(languageManager.language == "tr" ? "🇹🇷" : "🇬🇧")
+                                .font(.title3)
+                                .frame(width: 32, height: 32)
+                                .background(Color.gray.opacity(0.15))
+                                .clipShape(Circle())
+                        }
+                        
                         if !premiumManager.isPremium {
-                            Button {
-                                showPaywall = true
-                            } label: {
+                            Button { showPaywall = true } label: {
                                 Image(systemName: "star.fill")
                                     .foregroundColor(.yellow)
                             }
@@ -287,34 +287,36 @@ struct ContentView: View {
                     }
                 }
             }
-            .alert("Limit Doldu! 🚫", isPresented: $showLimitAlert) {
-                Button("Pro'ya Geç") { showPaywall = true }
-                Button("İptal", role: .cancel) {}
+            .alert("limit_title".localized(using: languageManager), isPresented: $showLimitAlert) {
+                Button("go_pro".localized(using: languageManager)) { showPaywall = true }
+                Button("cancel".localized(using: languageManager), role: .cancel) {}
             } message: {
-                Text("Ücretsiz sürümde en fazla 5 görev ekleyebilirsin. Pro'ya geçerek sınırsız görev ekle!")
+                Text("limit_message".localized(using: languageManager))
             }
-            .sheet(isPresented: $showPaywall) {
-                PaywallView()
-            }
+            .sheet(isPresented: $showPaywall) { PaywallView() }
             .sheet(isPresented: $showReminderSheet) {
                 NavigationStack {
                     VStack(spacing: 24) {
                         if let item = reminderItem {
-                            Text(item.title)
-                                .font(.headline)
+                            Text(item.title).font(.headline)
                         }
-                        DatePicker("Hatırlatma Zamanı", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
-                            .datePickerStyle(.graphical)
-                            .padding()
+                        DatePicker(
+                            "reminder_time".localized(using: languageManager),
+                            selection: $reminderDate,
+                            in: Date()...,
+                            displayedComponents: [.date, .hourAndMinute]
+                        )
+                        .datePickerStyle(.graphical)
+                        .padding()
                     }
-                    .navigationTitle("Hatırlatıcı Ekle")
+                    .navigationTitle("add_reminder".localized(using: languageManager))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("İptal") { showReminderSheet = false }
+                            Button("cancel".localized(using: languageManager)) { showReminderSheet = false }
                         }
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Kaydet") {
+                            Button("save".localized(using: languageManager)) {
                                 if let item = reminderItem {
                                     vm.setReminder(for: item, at: reminderDate)
                                 }
@@ -328,7 +330,125 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Category Chip
+struct CategoryChip: View {
+    let title: String
+    let icon: String
+    let color: Color
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .font(.subheadline)
+            .fontWeight(isSelected ? .semibold : .regular)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(isSelected ? color : Color.gray.opacity(0.15))
+            .foregroundColor(isSelected ? .white : .primary)
+            .clipShape(Capsule())
+            .shadow(color: isSelected ? color.opacity(0.4) : .clear, radius: 4, x: 0, y: 2)
+        }
+        .animation(.spring(), value: isSelected)
+    }
+}
+
+// MARK: - Todo Row
+struct TodoRowView: View {
+    let item: TodoItem
+    let languageManager: LanguageManager
+    let isPremium: Bool
+    let onToggle: () -> Void
+    let onReminder: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onToggle) {
+                Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                    .foregroundColor(item.isCompleted ? .green : .gray)
+                    .font(.title2)
+            }
+            .buttonStyle(.plain)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.title)
+                    .strikethrough(item.isCompleted)
+                    .foregroundColor(item.isCompleted ? .gray : .primary)
+                    .fontWeight(.medium)
+                
+                HStack(spacing: 6) {
+                    Label(item.category.title(using: languageManager), systemImage: item.category.icon)
+                        .font(.caption)
+                        .foregroundColor(item.category.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(item.category.color.opacity(0.1))
+                        .cornerRadius(6)
+                    
+                    Label(item.priority.title(using: languageManager), systemImage: item.priority.icon)
+                        .font(.caption)
+                        .foregroundColor(item.priority.color)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(item.priority.color.opacity(0.1))
+                        .cornerRadius(6)
+                    
+                    if let date = item.reminderDate {
+                        Label(date.formatted(date: .omitted, time: .shortened), systemImage: "bell.fill")
+                            .font(.caption)
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(6)
+                    }
+                }
+            }
+            
+            Spacer()
+            
+            if isPremium {
+                Button(action: onReminder) {
+                    Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
+                        .foregroundColor(item.reminderDate != nil ? .blue : .gray)
+                        .font(.title3)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(12)
+        .background(Color.gray.opacity(0.08))
+        .cornerRadius(16)
+    }
+}
+
+// MARK: - Color Hex
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3:
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
+    }
+}
+
 #Preview {
     ContentView()
         .environmentObject(ThemeManager())
+        .environmentObject(LanguageManager())
 }
