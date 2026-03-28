@@ -1,0 +1,39 @@
+/* 
+  Localizable.strings
+  TodoApp
+
+  Created by Baran on 28.03.2026.
+  
+*/
+
+"app_title" = "My Tasks";
+"new_task" = "New task...";
+"search_task" = "Search tasks...";
+"all" = "All";
+"edit" = "Edit";
+"cancel" = "Cancel";
+"save" = "Save";
+"add_reminder" = "Add Reminder";
+"reminder_time" = "Reminder Time";
+"stats" = "Statistics";
+"total" = "Total";
+"completed" = "Completed";
+"pending" = "Pending";
+"completion_rate" = "Completion Rate";
+"go_pro" = "Go Pro";
+"pro_subtitle" = "One-time payment";
+"restore" = "Restore purchases";
+"limit_title" = "Limit Reached! 🚫";
+"limit_message" = "You can add up to 5 tasks in the free version.";
+"pro_banner" = "Go Pro — Unlimited tasks & more";
+"low" = "Low";
+"medium" = "Medium";
+"high" = "High";
+"personal" = "Personal";
+"work" = "Work";
+"shopping" = "Shopping";
+"health" = "Health";
+"other" = "Other";
+"dark_mode" = "Dark Mode";
+"settings" = "Settings";
+"test_pro" = "🧪 Test: Activate Pro";

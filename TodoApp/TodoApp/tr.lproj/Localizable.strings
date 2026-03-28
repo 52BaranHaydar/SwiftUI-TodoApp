@@ -1,0 +1,39 @@
+/* 
+  Localizable.strings
+  TodoApp
+
+  Created by Baran on 28.03.2026.
+  
+*/
+
+"app_title" = "Görevlerim";
+"new_task" = "Yeni görev...";
+"search_task" = "Görev ara...";
+"all" = "Tümü";
+"edit" = "Düzenle";
+"cancel" = "İptal";
+"save" = "Kaydet";
+"add_reminder" = "Hatırlatıcı Ekle";
+"reminder_time" = "Hatırlatma Zamanı";
+"stats" = "İstatistikler";
+"total" = "Toplam";
+"completed" = "Tamamlanan";
+"pending" = "Bekleyen";
+"completion_rate" = "Tamamlanma Oranı";
+"go_pro" = "Pro'ya Geç";
+"pro_subtitle" = "Tek seferlik ödeme";
+"restore" = "Satın alımları geri yükle";
+"limit_title" = "Limit Doldu! 🚫";
+"limit_message" = "Ücretsiz sürümde en fazla 5 görev ekleyebilirsin.";
+"pro_banner" = "Pro'ya geç — Sınırsız görev & daha fazlası";
+"low" = "Düşük";
+"medium" = "Orta";
+"high" = "Yüksek";
+"personal" = "Kişisel";
+"work" = "İş";
+"shopping" = "Alışveriş";
+"health" = "Sağlık";
+"other" = "Diğer";
+"dark_mode" = "Karanlık Mod";
+"settings" = "Ayarlar";
+"test_pro" = "🧪 Test: Pro'yu Aktif Et";
