@@ -4,12 +4,12 @@
 //
 //  Created by Baran on 28.03.2026.
 //
-
 import SwiftUI
 
 struct ContentView: View {
     @StateObject private var vm = TodoViewModel()
     @EnvironmentObject var themeManager: ThemeManager
+    @ObservedObject var premiumManager = PremiumManager.shared
     @State private var newTitle = ""
     @State private var selectedCategory: Category = .personal
     @State private var selectedPriority: Priority = .medium
@@ -17,9 +17,18 @@ struct ContentView: View {
     @State private var reminderItem: TodoItem? = nil
     @State private var reminderDate = Date()
     @State private var showReminderSheet = false
+    @State private var showPaywall = false
+    @State private var showLimitAlert = false
+    @State private var searchText = ""
+    
+    let freeLimit = 5
+    let freeCategories: [Category] = [.personal, .work]
     
     var filteredTodos: [TodoItem] {
-        let list = filterCategory == nil ? vm.todos : vm.todos.filter { $0.category == filterCategory }
+        var list = filterCategory == nil ? vm.todos : vm.todos.filter { $0.category == filterCategory }
+        if !searchText.isEmpty {
+            list = list.filter { $0.title.localizedCaseInsensitiveContains(searchText) }
+        }
         return list.sorted { $0.priority > $1.priority }
     }
     
@@ -31,9 +40,42 @@ struct ContentView: View {
         }
     }
     
+    var availableCategories: [Category] {
+        premiumManager.isPremium ? Category.allCases : freeCategories
+    }
+    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                
+                // Pro Banner (ücretsiz kullanıcılar için)
+                if !premiumManager.isPremium {
+                    Button {
+                        showPaywall = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                            Text("Pro'ya geç — Sınırsız görev & daha fazlası")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Spacer()
+                            Text("$0.99")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                        }
+                        .padding(.horizontal)
+                        .padding(.vertical, 10)
+                        .background(Color.blue.opacity(0.1))
+                        .foregroundColor(.blue)
+                    }
+                }
+                
+                // İstatistikler (Pro)
+                if premiumManager.isPremium {
+                    StatsView(todos: vm.todos)
+                        .padding(.top, 8)
+                }
                 
                 // Kategori Filtresi
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -50,7 +92,7 @@ struct ContentView: View {
                                 .clipShape(Capsule())
                         }
                         
-                        ForEach(Category.allCases, id: \.self) { category in
+                        ForEach(availableCategories, id: \.self) { category in
                             Button {
                                 filterCategory = category
                             } label: {
@@ -66,8 +108,40 @@ struct ContentView: View {
                                 .clipShape(Capsule())
                             }
                         }
+                        
+                        // Pro kategoriler kilidi
+                        if !premiumManager.isPremium {
+                            Button {
+                                showPaywall = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "lock.fill")
+                                    Text("Pro")
+                                }
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.yellow.opacity(0.2))
+                                .foregroundColor(.orange)
+                                .clipShape(Capsule())
+                            }
+                        }
                     }
                     .padding()
+                }
+                
+                // Arama (Pro)
+                if premiumManager.isPremium {
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.gray)
+                        TextField("Görev ara...", text: $searchText)
+                    }
+                    .padding(10)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
                 }
                 
                 // Görev ekleme alanı
@@ -75,22 +149,24 @@ struct ContentView: View {
                     TextField("Yeni görev...", text: $newTitle)
                         .textFieldStyle(.roundedBorder)
                     
-                    Menu {
-                        ForEach(Priority.allCases, id: \.self) { priority in
-                            Button {
-                                selectedPriority = priority
-                            } label: {
-                                Label(priority.title, systemImage: priority.icon)
+                    if premiumManager.isPremium {
+                        Menu {
+                            ForEach(Priority.allCases, id: \.self) { priority in
+                                Button {
+                                    selectedPriority = priority
+                                } label: {
+                                    Label(priority.title, systemImage: priority.icon)
+                                }
                             }
+                        } label: {
+                            Image(systemName: selectedPriority.icon)
+                                .font(.title2)
+                                .foregroundColor(priorityColor)
                         }
-                    } label: {
-                        Image(systemName: selectedPriority.icon)
-                            .font(.title2)
-                            .foregroundColor(priorityColor)
                     }
                     
                     Menu {
-                        ForEach(Category.allCases, id: \.self) { category in
+                        ForEach(availableCategories, id: \.self) { category in
                             Button {
                                 selectedCategory = category
                             } label: {
@@ -104,8 +180,12 @@ struct ContentView: View {
                     }
                     
                     Button {
-                        vm.add(title: newTitle, category: selectedCategory, priority: selectedPriority)
-                        newTitle = ""
+                        if !premiumManager.isPremium && vm.todos.count >= freeLimit {
+                            showLimitAlert = true
+                        } else {
+                            vm.add(title: newTitle, category: selectedCategory, priority: selectedPriority)
+                            newTitle = ""
+                        }
                     } label: {
                         Image(systemName: "plus.circle.fill")
                             .font(.title2)
@@ -114,6 +194,18 @@ struct ContentView: View {
                 }
                 .padding(.horizontal)
                 .padding(.bottom, 8)
+                
+                // Görev sayısı (ücretsiz)
+                if !premiumManager.isPremium {
+                    HStack {
+                        Text("\(vm.todos.count)/\(freeLimit) görev kullanılıyor")
+                            .font(.caption)
+                            .foregroundColor(vm.todos.count >= freeLimit ? .red : .gray)
+                        Spacer()
+                    }
+                    .padding(.horizontal)
+                    .padding(.bottom, 4)
+                }
                 
                 // Görev listesi
                 List {
@@ -156,13 +248,15 @@ struct ContentView: View {
                             
                             Spacer()
                             
-                            Button {
-                                reminderItem = item
-                                reminderDate = Date()
-                                showReminderSheet = true
-                            } label: {
-                                Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
-                                    .foregroundColor(item.reminderDate != nil ? .blue : .gray)
+                            if premiumManager.isPremium {
+                                Button {
+                                    reminderItem = item
+                                    reminderDate = Date()
+                                    showReminderSheet = true
+                                } label: {
+                                    Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
+                                        .foregroundColor(item.reminderDate != nil ? .blue : .gray)
+                                }
                             }
                         }
                     }
@@ -180,8 +274,27 @@ struct ContentView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
+                    HStack {
+                        if !premiumManager.isPremium {
+                            Button {
+                                showPaywall = true
+                            } label: {
+                                Image(systemName: "star.fill")
+                                    .foregroundColor(.yellow)
+                            }
+                        }
+                        EditButton()
+                    }
                 }
+            }
+            .alert("Limit Doldu! 🚫", isPresented: $showLimitAlert) {
+                Button("Pro'ya Geç") { showPaywall = true }
+                Button("İptal", role: .cancel) {}
+            } message: {
+                Text("Ücretsiz sürümde en fazla 5 görev ekleyebilirsin. Pro'ya geçerek sınırsız görev ekle!")
+            }
+            .sheet(isPresented: $showPaywall) {
+                PaywallView()
             }
             .sheet(isPresented: $showReminderSheet) {
                 NavigationStack {
@@ -190,7 +303,6 @@ struct ContentView: View {
                             Text(item.title)
                                 .font(.headline)
                         }
-                        
                         DatePicker("Hatırlatma Zamanı", selection: $reminderDate, in: Date()..., displayedComponents: [.date, .hourAndMinute])
                             .datePickerStyle(.graphical)
                             .padding()
@@ -199,9 +311,7 @@ struct ContentView: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .cancellationAction) {
-                            Button("İptal") {
-                                showReminderSheet = false
-                            }
+                            Button("İptal") { showReminderSheet = false }
                         }
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Kaydet") {
