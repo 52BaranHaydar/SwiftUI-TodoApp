@@ -15,6 +15,7 @@ struct ContentView: View {
     @State private var reminderItem: TodoItem? = nil
     @State private var reminderDate = Date()
     @State private var showReminderSheet = false
+    @EnvironmentObject var themeManager: ThemeManager
     
     var filteredTodos: [TodoItem] {
         let list = filterCategory == nil ? vm.todos : vm.todos.filter { $0.category == filterCategory }
@@ -187,18 +188,16 @@ struct ContentView: View {
                     .navigationTitle("Hatırlatıcı Ekle")
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("İptal") {
-                                showReminderSheet = false
+                        ToolbarItem(placement: .navigationBarLeading) {
+                            Button {
+                                themeManager.isDarkMode.toggle()
+                            } label: {
+                                Image(systemName: themeManager.isDarkMode ? "sun.max.fill" : "moon.fill")
+                                    .foregroundColor(themeManager.isDarkMode ? .yellow : .blue)
                             }
                         }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Kaydet") {
-                                if let item = reminderItem {
-                                    vm.setReminder(for: item, at: reminderDate)
-                                }
-                                showReminderSheet = false
-                            }
+                        ToolbarItem(placement: .navigationBarTrailing) {
+                            EditButton()
                         }
                     }
                 }
