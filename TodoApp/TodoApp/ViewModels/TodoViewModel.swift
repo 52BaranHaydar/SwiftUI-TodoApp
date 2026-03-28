@@ -4,6 +4,7 @@
 //
 //  Created by Baran on 28.03.2026.
 //
+
 import Foundation
 import Combine
 import SwiftUI
@@ -24,6 +25,13 @@ class TodoViewModel: ObservableObject {
         save()
     }
     
+    func update(_ item: TodoItem) {
+        if let index = todos.firstIndex(where: { $0.id == item.id }) {
+            todos[index] = item
+            save()
+        }
+    }
+    
     func toggle(_ item: TodoItem) {
         if let index = todos.firstIndex(where: { $0.id == item.id }) {
             todos[index].isCompleted.toggle()
@@ -39,6 +47,11 @@ class TodoViewModel: ObservableObject {
             NotificationManager.shared.cancel(for: todos[index])
         }
         todos.remove(atOffsets: offsets)
+        save()
+    }
+    
+    func move(from source: IndexSet, to destination: Int) {
+        todos.move(fromOffsets: source, toOffset: destination)
         save()
     }
     
