@@ -22,7 +22,6 @@ struct ContentView: View {
     @State private var showLimitAlert = false
     @State private var searchText = ""
     @State private var editingTodo: TodoItem? = nil
-    @State private var showCalendar = false
     @State private var selectedTab = 0
     
     let freeLimit = 5
@@ -57,21 +56,24 @@ struct ContentView: View {
             // Ana Sayfa
             mainView
                 .tabItem {
-                    Label("Görevler", systemImage: "checklist")
+                    Label(languageManager.language == "tr" ? "Görevler" : "Tasks",
+                          systemImage: "checklist")
                 }
                 .tag(0)
             
-            // Takvim (Pro)
+            // Takvim
             Group {
                 if premiumManager.isPremium {
                     CalendarView(todos: vm.todos)
                         .environmentObject(languageManager)
                 } else {
-                    proRequiredView(icon: "calendar", title: "Takvim")
+                    proRequiredView(icon: "calendar",
+                                   title: languageManager.language == "tr" ? "Takvim" : "Calendar")
                 }
             }
             .tabItem {
-                Label("Takvim", systemImage: "calendar")
+                Label(languageManager.language == "tr" ? "Takvim" : "Calendar",
+                      systemImage: "calendar")
             }
             .tag(1)
         }
@@ -309,34 +311,39 @@ struct ContentView: View {
                     }
                     
                     // Görev listesi
-                    List {
-                        ForEach(filteredTodos) { item in
-                            TodoRowView(
-                                item: item,
-                                languageManager: languageManager,
-                                isPremium: premiumManager.isPremium,
-                                onToggle: {
-                                    withAnimation(.spring()) { vm.toggle(item) }
-                                },
-                                onReminder: {
-                                    reminderItem = item
-                                    reminderDate = item.reminderDate ?? Date()
-                                    showReminderSheet = true
-                                },
-                                onEdit: {
-                                    editingTodo = item
-                                }
-                            )
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    if filteredTodos.isEmpty {
+                        EmptyStateView(filterCategory: filterCategory)
+                            .environmentObject(languageManager)
+                    } else {
+                        List {
+                            ForEach(filteredTodos) { item in
+                                TodoRowView(
+                                    item: item,
+                                    languageManager: languageManager,
+                                    isPremium: premiumManager.isPremium,
+                                    onToggle: {
+                                        withAnimation(.spring()) { vm.toggle(item) }
+                                    },
+                                    onReminder: {
+                                        reminderItem = item
+                                        reminderDate = item.reminderDate ?? Date()
+                                        showReminderSheet = true
+                                    },
+                                    onEdit: {
+                                        editingTodo = item
+                                    }
+                                )
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                            }
+                            .onDelete(perform: vm.delete)
+                            .onMove(perform: vm.move)
                         }
-                        .onDelete(perform: vm.delete)
-                        .onMove(perform: vm.move)
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
+                        .animation(.spring(), value: vm.todos.count)
                     }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                    .animation(.spring(), value: vm.todos.count)
                 }
             }
             .navigationTitle("app_title".localized(using: languageManager))
@@ -389,15 +396,25 @@ struct ContentView: View {
     // MARK: - Pro Gerekli Görünüm
     func proRequiredView(icon: String, title: String) -> some View {
         VStack(spacing: 20) {
-            Image(systemName: icon)
-                .font(.system(size: 60))
-                .foregroundColor(.gray.opacity(0.4))
+            Spacer()
+            
+            ZStack {
+                Circle()
+                    .fill(Color.blue.opacity(0.1))
+                    .frame(width: 120, height: 120)
+                
+                Image(systemName: icon)
+                    .font(.system(size: 50))
+                    .foregroundColor(.blue.opacity(0.4))
+            }
             
             Text(title)
                 .font(.title2)
                 .fontWeight(.bold)
             
-            Text("Bu özellik Pro sürümde mevcut")
+            Text(languageManager.language == "tr"
+                 ? "Bu özellik Pro sürümde mevcut"
+                 : "This feature is available in Pro")
                 .font(.subheadline)
                 .foregroundColor(.gray)
                 .multilineTextAlignment(.center)
@@ -408,7 +425,7 @@ struct ContentView: View {
                 HStack {
                     Image(systemName: "star.fill")
                         .foregroundColor(.yellow)
-                    Text("Pro'ya Geç — $0.99")
+                    Text(languageManager.language == "tr" ? "Pro'ya Geç — $0.99" : "Go Pro — $0.99")
                         .fontWeight(.bold)
                 }
                 .padding()
@@ -418,6 +435,8 @@ struct ContentView: View {
                 .cornerRadius(16)
                 .padding(.horizontal, 40)
             }
+            
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -450,7 +469,6 @@ struct CategoryChip: View {
     }
 }
 
-// MARK: - Todo Row
 // MARK: - Todo Row
 struct TodoRowView: View {
     let item: TodoItem
@@ -538,6 +556,7 @@ struct TodoRowView: View {
         .contentShape(Rectangle())
     }
 }
+
 // MARK: - Color Hex
 extension Color {
     init(hex: String) {
@@ -555,7 +574,7 @@ extension Color {
         default:
             (a, r, g, b) = (1, 1, 1, 0)
         }
-        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue:  Double(b) / 255, opacity: Double(a) / 255)
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }
 
