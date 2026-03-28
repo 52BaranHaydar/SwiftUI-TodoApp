@@ -451,6 +451,7 @@ struct CategoryChip: View {
 }
 
 // MARK: - Todo Row
+// MARK: - Todo Row
 struct TodoRowView: View {
     let item: TodoItem
     let languageManager: LanguageManager
@@ -475,32 +476,38 @@ struct TodoRowView: View {
                     .foregroundColor(item.isCompleted ? .gray : .primary)
                     .fontWeight(.medium)
                     .animation(.easeInOut, value: item.isCompleted)
+                    .lineLimit(2)
                 
-                HStack(spacing: 6) {
-                    Label(item.category.title(using: languageManager), systemImage: item.category.icon)
-                        .font(.caption)
-                        .foregroundColor(item.category.color)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(item.category.color.opacity(0.15))
-                        .cornerRadius(6)
-                    
-                    Label(item.priority.title(using: languageManager), systemImage: item.priority.icon)
-                        .font(.caption)
-                        .foregroundColor(item.priority.color)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(item.priority.color.opacity(0.15))
-                        .cornerRadius(6)
-                    
-                    if let date = item.reminderDate {
-                        Label(date.formatted(date: .omitted, time: .shortened), systemImage: "bell.fill")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        Label(item.category.title(using: languageManager), systemImage: item.category.icon)
                             .font(.caption)
-                            .foregroundColor(.blue)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.blue.opacity(0.15))
+                            .foregroundColor(item.category.color)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(item.category.color.opacity(0.15))
                             .cornerRadius(6)
+                            .fixedSize()
+                        
+                        Label(item.priority.title(using: languageManager), systemImage: item.priority.icon)
+                            .font(.caption)
+                            .foregroundColor(item.priority.color)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(item.priority.color.opacity(0.15))
+                            .cornerRadius(6)
+                            .fixedSize()
+                        
+                        if let date = item.reminderDate {
+                            Label(date.formatted(date: .omitted, time: .shortened), systemImage: "bell.fill")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(Color.blue.opacity(0.15))
+                                .cornerRadius(6)
+                                .fixedSize()
+                        }
                     }
                 }
             }
@@ -508,7 +515,6 @@ struct TodoRowView: View {
             Spacer()
             
             HStack(spacing: 8) {
-                // Düzenle butonu
                 Button(action: onEdit) {
                     Image(systemName: "pencil.circle.fill")
                         .foregroundColor(.blue.opacity(0.7))
@@ -516,7 +522,6 @@ struct TodoRowView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Hatırlatıcı butonu (Pro)
                 if isPremium {
                     Button(action: onReminder) {
                         Image(systemName: item.reminderDate != nil ? "bell.fill" : "bell")
@@ -533,7 +538,6 @@ struct TodoRowView: View {
         .contentShape(Rectangle())
     }
 }
-
 // MARK: - Color Hex
 extension Color {
     init(hex: String) {
